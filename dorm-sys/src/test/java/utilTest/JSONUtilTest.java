@@ -1,3 +1,5 @@
+package utilTest;
+
 import org.junit.Test;
 import util.JSONUtil;
 
