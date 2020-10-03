@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder;
 import javax.websocket.*;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
+import java.io.IOException;
 
 //处理websocket相关通信逻辑
 @ServerEndpoint("/game/{userId}")
@@ -16,6 +17,17 @@ public class GameAPI {
         public String roomId;
         public int row;
         public int col;
+
+        @Override
+        public String toString() {
+            return "Request{" +
+                    "type='" + type + '\'' +
+                    ", userId=" + userId +
+                    ", roomId='" + roomId + '\'' +
+                    ", row=" + row +
+                    ", col=" + col +
+                    '}';
+        }
     }
     private int userId;
     @OnOpen
@@ -45,7 +57,7 @@ public class GameAPI {
 
 
     @OnMessage
-    public void onMessage(String message, Session session) throws InterruptedException {
+    public void onMessage(String message, Session session) throws InterruptedException, IOException {
         System.out.printf("收到玩家 %d 的消息: %s\n",userId,message);
         //使用Gson解析数据
         //实例化Gson对象
@@ -56,7 +68,8 @@ public class GameAPI {
             //搞一个匹配队列
             Matcher.getInstance().addMatchqueue(request);
         } else if (request.type.equals("putChess")) {
-
+            Room curRoom = RoomManager.getInstance().getRoom(request.roomId);
+            curRoom.putChess(request);
         } else {
             System.out.println("非法的type值！" + request.type);
         }

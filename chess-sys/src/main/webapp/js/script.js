@@ -37,62 +37,70 @@ function setScreenText(me) {
 //////////////////////////////////////////////////
 // 初始化 websocket
 //////////////////////////////////////////////////
-var webSocket = new WebSocket("ws://localhost:8080/chess/game/"+gameInfo.userId);
-webSocket.onopen = function () {
-    console.log("连接建立成功！" + gameInfo.userId);
+
+var websocket = new WebSocket("ws://127.0.0.1:8080/chess/game/" + gameInfo.userId);
+
+// 给 websocket 对象实现对应的方法
+websocket.onopen = function () {
+    console.log("连接建立成功!" + gameInfo.userId);
 }
-webSocket.onclose = function () {
-    console.log("连接断开！" + gameInfo.userId);
+
+websocket.onclose = function () {
+    console.log("连接断开! " + gameInfo.userId);
 }
-webSocket.onerror = function () {
-    console.log("连接异常！" +gameInfo.userId);
+
+websocket.onerror = function () {
+    console.log("连接异常! " + gameInfo.userId);
 }
-webSocket.onmessage = function() {
-    //TODO
-    //处理服务器返回的响应
+
+websocket.onmessage = function () {
+    // TODO 处理服务器返回的响应, 比较复杂, 一会再写.
 }
-window.onbeforeunload = function() {
-    webSocket.onclose();
+
+window.onbeforeunload = function () {
+    websocket.close();
 }
+
 //////////////////////////////////////////////////
 // 实现匹配逻辑
 //////////////////////////////////////////////////
-function startMatch(userId) {
-    //1.设置处理响应的函数
-    webSocket.onmessage = handlerStartMatch;
-    //2.构造要发送的数据内容
-    var message = {
-        type: "startMatch",
-        userId: userId
-    }
-    //3.发送数据给服务器
-    webSocket.send(JSON.stringify(message));
 
+function startMatch(userId) {
+    // 1. 设置处理响应的函数.
+    websocket.onmessage = handlerStartMatch;
+    // 2. 先构造要发送的数据内容
+    var message = {
+        type: 'startMatch',
+        userId: userId
+    };
+    // 3. 发送数据给服务器
+    websocket.send(JSON.stringify(message));
 }
 
 function handlerStartMatch(event) {
-    //1.读取响应内容
-    var response = JSON.parse(event.data) // 得到服务器真是的返回数据
+    // 1. 读取响应内容
+    var response = JSON.parse(event.data) // 才能得到真实的服务器返回的数据
     console.log("handlerStartMatch: " + response);
-    //2.过滤非法的相应内容
+    // 2. 过滤非法的响应类型
     if (response.type != "startMatch") {
-        //服务器响应的数据不对，直接忽略错误数据
+        // 服务器响应的数据不对, 直接忽略错误数据
         return;
     }
-    //3.把相应的结果保存到gameInFo对象中
+    // 3. 把响应的结果保存到 gameInfo 对象中
     gameInfo.roomId = response.roomId;
     gameInfo.isWhite = response.isWhite;
     gameInfo.otherUserId = response.otherUserId;
-    //4.隐藏匹配按钮
+    // 4. 隐藏匹配按钮.
     hideMatchButton();
-    //5.设置提示信息(轮到谁落子)
-    //参数为true：表示自己落子，参数为false表示对方落子
-    // 白棋先走
+    // 5. 设置提示信息(轮到谁落子)
+    //    参数为 true 表示自己落子, 参数为 false 表示对方落子.
+    //    白棋先走.
     setScreenText(gameInfo.isWhite);
-    //6.初始化一局游戏
+    // 6. 初始化一局游戏
     initGame();
 }
-/////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
 // 匹配成功, 则初始化一局游戏
 //////////////////////////////////////////////////
 function initGame() {
@@ -162,7 +170,7 @@ function initGame() {
         var row = Math.floor(y / 30);
         if (chessBoard[row][col] == 0) {
             // 新增发送数据给服务器的逻辑
-            send(row,col);
+            send(row, col);
             // oneStep(col, row, gameInfo.isWhite);
             // chessBoard[row][col] = 1;
             // 通过这个语句控制落子轮次
@@ -171,46 +179,63 @@ function initGame() {
     }
 
     function send(row, col) {
-        console.log("send: " + row + "," + col);
+        console.log("send: " + row + ", " + col);
         var request = {
             type: "putChess",
             userId: gameInfo.userId,
-            roomId: gameInfo.roomI,
+            roomId: gameInfo.roomId,
             row: row,
             col: col
         }
-        webSocket.send(JSON.stringify(request));
+        websocket.send(JSON.stringify(request));
     }
 
-
     // 新增处理服务器返回数据的请求
-    //      并绘制棋子, 以及判定胜负
+    // 并绘制棋子, 以及判定胜负
     function handlerPutChess(event) {
         console.log("handlerPutChess: " + event.data);
+        // event.data 是一个字符串, 需要转回成一个 JSON 对象.
+        // 1. 读取响应内容
         var response = JSON.parse(event.data);
         if (response.type != "putChess") {
-            console.log("响应不匹配");
+            console.log("handlerPutChess: 响应类型不匹配");
             return;
         }
+        // 2. 根据响应内容, 决定绘制哪种颜色的棋子.
         if (response.userId == gameInfo.userId) {
-            oneStep(response.row,response.col, gameInfo.isWhite);
+            // 当前棋子是自己落的, 于是就根据自己的 isWhite 来绘制棋子
+            oneStep(response.col, response.row, gameInfo.isWhite);
         } else {
-            oneStep(response.row,response.col, !gameInfo.isWhite);
+            // 当前棋子是对方落的, 于是就根据对方的 isWhite 值来绘制.
+            // 对方的 isWhite 一定和自己相反.
+            oneStep(response.col, response.row, !gameInfo.isWhite);
         }
+        // 3. 给棋盘数组上记录位置. (防止同一个位置被落子多次)
         chessBoard[response.row][response.col] = 1;
+        // 每次落子完毕, 就需要更新 me, 表示由对方来进行落子.
         me = !me;
+        // 4. 处理胜负
         if (response.winner != 0) {
+            // 胜负已分
             if (response.winner == gameInfo.userId) {
-                alert("您赢了");
+                // 我赢了
+                alert("您赢了!"); // alert 是 js 中弹对话框的函数.
             } else {
-                alert("您输了");
+                // 对方赢了
+                alert("您输了!");
             }
+            // 自动刷新页面. 以备进行下一局游戏.
+            // 一旦页面刷新, 当前这里的这些 JS 代码的变量, 状态之类的就都没有了.
             window.location.reload();
         }
+        // 5. 更新界面显示 "轮到 xx 落子"
         setScreenText(me);
     }
 
-    webSocket.onmessage = handlerPutChess;
+    websocket.onmessage = handlerPutChess;
 }
+
+// 应该在匹配成功后在绘制棋盘
+// initGame();
 
 
